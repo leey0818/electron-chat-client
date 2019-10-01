@@ -1,29 +1,29 @@
-# client
+# Electron chat client with Vue.js
 
-## Project setup
+Vue.js 프레임워크를 이용한 Electron 채팅 클라이언트 입니다.
+
+
+### 프로젝트 초기 구성
 ```
 npm install
 ```
 
-### Compiles and hot-reloads for development
+### 개발
 ```
-npm run serve
+npm run dev
 ```
 
-### Compiles and minifies for production
+### 빌드
 ```
 npm run build
 ```
 
-### Run your tests
+### 테스트
 ```
 npm run test
 ```
 
-### Lints and fixes files
+### 문법 검사
 ```
 npm run lint
 ```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).

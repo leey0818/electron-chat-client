@@ -1,0 +1,36 @@
+{
+  "name": "chat-client",
+  "version": "1.0.0",
+  "author": "leey0818@gmail.com",
+  "license": "MIT",
+  "main": "background.js",
+  "scripts": {
+    "dev": "vue-cli-service electron:serve",
+    "build": "vue-cli-serve electron:build",
+    "lint": "vue-cli-service lint",
+    "postinstall": "electron-builder install-app-deps",
+    "postuninstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@babel/polyfill": "^7.4.4",
+    "@fortawesome/fontawesome-free": "^5.8.2",
+    "core-js": "^2.6.5",
+    "roboto-fontface": "*",
+    "vue": "^2.6.10",
+    "vuetify": "^2.0.0",
+    "vuex": "^3.0.1"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "^3.11.0",
+    "@vue/cli-plugin-eslint": "^3.11.0",
+    "@vue/cli-service": "^3.11.0",
+    "@vue/eslint-config-airbnb": "^4.0.0",
+    "babel-eslint": "^10.0.1",
+    "electron": "^5.0.0",
+    "eslint": "^5.16.0",
+    "eslint-plugin-vue": "^5.0.0",
+    "vue-cli-plugin-electron-builder": "^1.4.0",
+    "vue-cli-plugin-vuetify": "^0.6.3",
+    "vue-template-compiler": "^2.6.10"
+  }
+}

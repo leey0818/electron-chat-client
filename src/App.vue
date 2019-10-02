@@ -1,10 +1,9 @@
 <template>
-  <v-app>
+  <v-app class="fill-height">
     <v-slide-y-transition>
       <v-system-bar
         v-if="!isConnected"
         color="red"
-        style="z-index:9"
         height="40"
         fixed
         dark
@@ -15,14 +14,12 @@
     </v-slide-y-transition>
 
     <!-- sidebar -->
-    <v-navigation-drawer color="#434753" app dark permanent>
+    <v-row no-gutters>
       <chat-sidebar></chat-sidebar>
-    </v-navigation-drawer>
-
-    <!-- room -->
-    <v-content>
-      <chat-room></chat-room>
-    </v-content>
+      <v-col class="fill-height">
+        <chat-room></chat-room>
+      </v-col>
+    </v-row>
   </v-app>
 </template>
 
@@ -41,3 +38,13 @@ export default {
   }),
 };
 </script>
+
+<style>
+html, body {
+  width: 100%;
+  height: 100%;
+}
+.mnh-100 {
+  min-height: 100%;
+}
+</style>

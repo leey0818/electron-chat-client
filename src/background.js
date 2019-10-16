@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import {
   app,
   protocol,
@@ -44,31 +43,12 @@ function createWindow() {
   }
 
   win.on('closed', () => {
-    socket.close();
-    socket = null;
     win = null;
+    socket.setBrowserWindow(null);
   });
 
-  socket = new ChatSocket(win);
-  socket.addIpcEmitter('message.receive');
-  socket.addIpcEmitter('user.enter');
+  socket.setBrowserWindow(win);
 }
-
-ipcMain.on('req.reconnect', () => {
-  socket.connect();
-});
-
-ipcMain.on('getConnection', () => {
-  win.webContents.send('connection', {
-    connect: socket.isConnected(),
-    retryCount: socket.getRetryCount(),
-    maxCount: ChatSocket.getMaxRetryCount(),
-  });
-});
-
-ipcMain.on('message.send', (e, data) => {
-  socket.emit('message.send', data);
-});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
@@ -105,7 +85,18 @@ app.on('ready', async () => {
       console.error('Vue Devtools failed to install:', e.toString());
     }
   }
+
+  socket = new ChatSocket();
+  socket.addIpcEmitter('message.receive');
+  socket.addIpcEmitter('user.enter');
+
   createWindow();
+});
+
+app.on('will-quit', () => {
+  console.log('application will be quit. closing socket...');
+  socket.close();
+  socket = null;
 });
 
 // Exit cleanly on request from parent process in development mode.
@@ -122,3 +113,19 @@ if (isDevelopment) {
     });
   }
 }
+
+ipcMain.on('req.reconnect', () => {
+  socket.connect();
+});
+
+ipcMain.on('getConnection', () => {
+  win.webContents.send('connection', {
+    connect: socket.isConnected(),
+    retryCount: socket.getRetryCount(),
+    maxCount: ChatSocket.getMaxRetryCount(),
+  });
+});
+
+ipcMain.on('message.send', (e, data) => {
+  socket.emit('message.send', data);
+});

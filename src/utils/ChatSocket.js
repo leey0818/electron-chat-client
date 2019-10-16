@@ -4,13 +4,9 @@ import config from '../config/socket';
 let instance;
 
 export default class ChatSocket {
-  constructor(window) {
-    if (instance && window === this.window) return instance;
+  constructor() {
+    if (instance) return instance;
 
-    // 소켓이 이미 연결되어 있다면, 종료 후 재연결
-    if (this.isConnected()) this.close();
-
-    this.window = window;
     this.socket = io(config.url, config.options);
     this.retryCount = -1;
 
@@ -40,25 +36,16 @@ export default class ChatSocket {
     instance = this;
   }
 
+  static getMaxRetryCount() {
+    return config.options.reconnectionAttempts;
+  }
+
   isConnected() {
     return this.socket && this.socket.connected;
   }
 
   getRetryCount() {
     return this.retryCount;
-  }
-
-  static getMaxRetryCount() {
-    return config.options.reconnectionAttempts;
-  }
-
-  /**
-   * Renderer 프로세스로 메세지를 전송합니다.
-   * @param {string} eventName 이벤트명
-   * @param {any} data 보낼 데이터
-   */
-  sendWindowMessage(eventName, data) {
-    this.window.webContents.send(eventName, data);
   }
 
   /**
@@ -71,8 +58,24 @@ export default class ChatSocket {
     });
   }
 
-  emit(event, ...args) {
-    this.socket.emit(event, ...args);
+  /**
+   * Renderer 프로세스로 메세지를 전송합니다.
+   * Window가 닫힌 상태에서는 메시지를 전송하지 않습니다.
+   * @param {string} eventName 이벤트명
+   * @param {any} data 보낼 데이터
+   */
+  sendWindowMessage(eventName, data) {
+    if (!this.window) return;
+
+    this.window.webContents.send(eventName, data);
+  }
+
+  setBrowserWindow(window) {
+    this.window = window;
+  }
+
+  emit(event, data) {
+    this.socket.emit(event, data);
   }
 
   connect() {

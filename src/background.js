@@ -8,8 +8,12 @@ import {
   createProtocol,
   installVueDevtools,
 } from 'vue-cli-plugin-electron-builder/lib';
+import log4js from 'log4js';
+import config from './config';
 import ChatSocket from './utils/ChatSocket';
 
+log4js.configure(config.logger);
+const logger = log4js.getLogger('main');
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -43,10 +47,12 @@ function createWindow() {
   }
 
   win.on('closed', () => {
+    logger.debug('Window closed');
     win = null;
     socket.setBrowserWindow(null);
   });
 
+  logger.debug('Window created');
   socket.setBrowserWindow(win);
 }
 
@@ -82,7 +88,7 @@ app.on('ready', async () => {
     try {
       await installVueDevtools();
     } catch (e) {
-      console.error('Vue Devtools failed to install:', e.toString());
+      logger.error('Vue Devtools failed to install:', e.toString());
     }
   }
 
@@ -94,9 +100,8 @@ app.on('ready', async () => {
 });
 
 app.on('will-quit', () => {
-  console.log('application will be quit. closing socket...');
+  logger.info('Application will be quit. closing socket...');
   socket.close();
-  socket = null;
 });
 
 // Exit cleanly on request from parent process in development mode.

@@ -1,5 +1,8 @@
 import io from 'socket.io-client';
+import log4js from 'log4js';
 import config from '../config/socket';
+
+const logger = log4js.getLogger('socket');
 
 let instance;
 
@@ -11,12 +14,12 @@ export default class ChatSocket {
     this.retryCount = -1;
 
     this.socket.on('connect', () => {
-      console.log(`connected! ${this.socket.id}`);
+      logger.debug('connected!', this.socket.id);
       this.id = this.socket.id;
       this.sendWindowMessage('connection', { connect: true });
     });
     this.socket.on('reconnecting', (retry) => {
-      console.log(`reconnecting... ${retry}`);
+      logger.debug('reconnecting...', retry);
       this.retryCount = retry;
       this.sendWindowMessage('connection', { connect: false, retryCount: retry });
     });
@@ -25,13 +28,13 @@ export default class ChatSocket {
       this.sendWindowMessage('connection', { connect: false, retryCount: retry });
     });
     this.socket.on('reconnect_failed', () => {
-      console.log('reconect failed!');
+      logger.debug('reconnect failed!');
       this.retryCount = -1;
       this.sendWindowMessage('connection', { connect: false, retryCount: -1 });
     });
 
-    this.socket.on('ping', () => console.log('send ping!'));
-    this.socket.on('pong', latency => console.log(`received pong! ${latency}ms`));
+    this.socket.on('ping', () => logger.debug('send ping!'));
+    this.socket.on('pong', latency => logger.debug(`received pong! ${latency}ms`));
 
     instance = this;
   }

@@ -6,7 +6,7 @@
   "main": "background.js",
   "scripts": {
     "dev": "vue-cli-service electron:serve",
-    "build": "vue-cli-serve electron:build",
+    "build": "vue-cli-service electron:build",
     "lint": "vue-cli-service lint",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps"

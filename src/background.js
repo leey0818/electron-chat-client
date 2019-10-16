@@ -1,15 +1,22 @@
 /* eslint-disable import/no-extraneous-dependencies */
-import { app, protocol, BrowserWindow } from 'electron';
+import {
+  app,
+  protocol,
+  BrowserWindow,
+  ipcMain,
+} from 'electron';
 import {
   createProtocol,
   installVueDevtools,
 } from 'vue-cli-plugin-electron-builder/lib';
+import ChatSocket from './utils/ChatSocket';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let win;
+let socket;
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: true, standard: true } }]);
@@ -19,6 +26,8 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1400,
     height: 750,
+    minWidth: 700,
+    minHeight: 500,
     webPreferences: {
       nodeIntegration: true,
     },
@@ -35,9 +44,31 @@ function createWindow() {
   }
 
   win.on('closed', () => {
+    socket.close();
+    socket = null;
     win = null;
   });
+
+  socket = new ChatSocket(win);
+  socket.addIpcEmitter('message.receive');
+  socket.addIpcEmitter('user.enter');
 }
+
+ipcMain.on('req.reconnect', () => {
+  socket.connect();
+});
+
+ipcMain.on('getConnection', () => {
+  win.webContents.send('connection', {
+    connect: socket.isConnected(),
+    retryCount: socket.getRetryCount(),
+    maxCount: ChatSocket.getMaxRetryCount(),
+  });
+});
+
+ipcMain.on('message.send', (e, data) => {
+  socket.emit('message.send', data);
+});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {

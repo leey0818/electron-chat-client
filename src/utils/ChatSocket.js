@@ -1,22 +1,58 @@
-import io from 'socket.io-client';
-import log4js from 'log4js';
-import config from '../config/socket';
+const io = require('socket.io-client');
+const log4js = require('log4js');
+const config = require('../config').socket;
 
 const logger = log4js.getLogger('socket');
 
-let instance;
-
-export default class ChatSocket {
-  constructor() {
-    if (instance) return instance;
-
-    this.socket = io(config.url, config.options);
+class ChatSocket {
+  constructor(opts) {
+    this.opts = Object.assign({}, config.options, opts);
     this.retryCount = -1;
+  }
 
+  static getMaxRetryCount() {
+    return config.options.reconnectionAttempts;
+  }
+
+  isConnected() {
+    return this.socket && this.socket.connected;
+  }
+
+  getRetryCount() {
+    return this.retryCount;
+  }
+
+  connect(token) {
+    if (this.isConnected()) return;
+
+    this.socket = io(config.url, Object.assign(this.opts, { query: { token } }));
     this.socket.on('connect', () => {
       logger.debug('connected!', this.socket.id);
       this.id = this.socket.id;
       this.sendWindowMessage('connection', { connect: true });
+    });
+    this.socket.emit('connect_error', () => {
+      logger.debug('socket disconnected.');
+      this.sendWindowMessage('connection', { connect: false, retryCount: -1 });
+    });
+    this.socket.on('disconnect', (reason) => {
+      logger.debug('socket disconnected.');
+
+      if (reason === 'io server disconnect') {
+        this.connect();
+      }
+    });
+    this.socket.on('error', (err) => {
+      logger.warn(err);
+
+      // socket close
+      // this.close();
+
+      if (err === 'invalid token') {
+        console.log('invalid token error!');
+      }
+
+      this.sendWindowMessage('connection', { connect: false, retryCount: -1 });
     });
     this.socket.on('reconnecting', (retry) => {
       logger.debug('reconnecting...', retry);
@@ -36,19 +72,11 @@ export default class ChatSocket {
     this.socket.on('ping', () => logger.debug('send ping!'));
     this.socket.on('pong', latency => logger.debug(`received pong! ${latency}ms`));
 
-    instance = this;
-  }
-
-  static getMaxRetryCount() {
-    return config.options.reconnectionAttempts;
-  }
-
-  isConnected() {
-    return this.socket && this.socket.connected;
-  }
-
-  getRetryCount() {
-    return this.retryCount;
+    // this.sendWindowMessage('connection', {
+    //   connect: this.isConnected(),
+    //   retryCount: this.getRetryCount(),
+    //   maxCount: config.options.reconnectionAttempts,
+    // });
   }
 
   /**
@@ -77,19 +105,22 @@ export default class ChatSocket {
     this.window = window;
   }
 
+  on(event, fn) {
+    this.socket.on(event, fn);
+  }
+
   emit(event, data) {
     this.socket.emit(event, data);
   }
 
-  connect() {
-    if (this.socket.disconnected) {
-      this.socket.connect();
-    }
-  }
-
   close() {
-    this.socket.close();
+    if (this.isConnected()) {
+      this.socket.close();
+      this.socket = null;
+    }
 
-    return this.socket.disconnected;
+    return !this.isConnected();
   }
 }
+
+module.exports = ChatSocket;

@@ -1,59 +1,177 @@
-import {
+const {
   app,
-  protocol,
   BrowserWindow,
+  dialog,
   ipcMain,
-} from 'electron';
-import {
+  protocol,
+} = require('electron');
+const {
   createProtocol,
   installVueDevtools,
-} from 'vue-cli-plugin-electron-builder/lib';
-import log4js from 'log4js';
-import config from './config';
-import ChatSocket from './utils/ChatSocket';
+} = require('vue-cli-plugin-electron-builder/lib');
+const log4js = require('log4js');
+const axios = require('axios');
+const moment = require('moment');
+
+const ChatSocket = require('./utils/ChatSocket');
+const Storage = require('./utils/Storage');
+const config = require('./config');
 
 log4js.configure(config.logger);
 const logger = log4js.getLogger('main');
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+const httpInstance = axios.create({ baseURL: 'http://localhost:3000' });
+const storage = new Storage({
+  configName: 'chat-client',
+});
+
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let win;
 let socket;
+let loginRequired = true;
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: true, standard: true } }]);
 
-function createWindow() {
-  // Create the browser window.
-  win = new BrowserWindow({
-    width: 1400,
-    height: 750,
-    minWidth: 700,
-    minHeight: 500,
-    webPreferences: {
-      nodeIntegration: true,
-    },
-  });
+function checkToken() {
+  const accessToken = storage.get('accessToken');
+  const refToken = storage.get('refreshToken');
 
-  if (process.env.WEBPACK_DEV_SERVER_URL) {
-    // Load the url of the dev server if in development mode
-    win.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
-    if (!process.env.IS_TEST) win.webContents.openDevTools();
-  } else {
-    createProtocol('app');
-    // Load the index.html when not in development
-    win.loadURL('app://./index.html');
+  logger.debug('checkToken :', accessToken);
+
+  if (!accessToken) {
+    if (refToken) {
+      return refreshToken(refToken);
+    }
+
+    return Promise.resolve(null);
   }
 
-  win.on('closed', () => {
-    logger.debug('Window closed');
-    win = null;
-    socket.setBrowserWindow(null);
-  });
+  return httpInstance.get('/api/auth/check', { headers: { authorization: `Bearer ${accessToken}` } })
+    .then(({ data }) => {
+      const leftTime = moment(data.info.exp * 1000).diff(moment(), 'seconds');
 
-  logger.debug('Window created');
-  socket.setBrowserWindow(win);
+      logger.debug('token left time...', leftTime, 's');
+      return accessToken;
+    })
+    .catch((error) => {
+      // authentication error!
+      if (error.response) {
+        if (error.response.status === 401) {
+          return refreshToken(storage.get('refreshToken'));
+        }
+        if (error.response.status === 403) {
+          logger.debug('token is not valid! remove token and request login-required');
+
+          storage.remove('accessToken');
+          storage.remove('refreshToken');
+
+          return null;
+        }
+      }
+
+      logger.error('Request Error!', error.message);
+      throw error;
+    });
+}
+
+function refreshToken(token) {
+  return httpInstance.post('/api/auth/token', { refreshToken: token })
+    .then(({ data }) => {
+      // 로컬저장소에 토큰 저장
+      storage.set('accessToken', data.token);
+
+      logger.debug('token refreshed!', data.token);
+      return data.token;
+    })
+    .catch((error) => {
+      // 재발급토큰 비정상 (만료, 불일치 등)
+      if (error.response && error.response.status === 401) {
+        logger.debug('refresh token is not valid! remove token and request login-required');
+
+        storage.remove('accessToken');
+        storage.remove('refreshToken');
+
+        return Promise.resolve(null);
+      }
+
+      logger.error('Request Error!', error.message);
+      throw error;
+    });
+}
+
+function appLogin(form) {
+  return httpInstance.post('/api/auth/login', { username: form.loginId, password: form.loginPw })
+    .then((res) => {
+      logger.debug('login successfully!', res.data.token);
+
+      storage.set('accessToken', res.data.token);
+      storage.set('refreshToken', res.data.refreshToken);
+
+      socket.connect(res.data.token);
+
+      return res.data.token;
+    });
+}
+
+function connectSocket(token) {
+  socket.connect(token);
+  socket.addIpcEmitter('message.receive');
+  socket.addIpcEmitter('user.enter');
+  socket.on('token.refresh', (data) => {
+    logger.debug('token refreshed! change token...', data.token);
+    socket.socket.io.opts.query = { token: data.token };
+    socket.close();
+    socket.connect();
+  });
+}
+
+function createWindow() {
+  checkToken()
+    .then((token) => {
+      // Create the browser window.
+      win = new BrowserWindow({
+        width: 1400,
+        height: 750,
+        minWidth: 700,
+        minHeight: 500,
+        webPreferences: {
+          nodeIntegration: true,
+        },
+      });
+
+      if (token) {
+        loginRequired = false;
+        connectSocket(token);
+      }
+
+      socket.setBrowserWindow(win);
+
+      if (process.env.WEBPACK_DEV_SERVER_URL) {
+        // Load the url of the dev server if in development mode
+        win.loadURL(process.env.WEBPACK_DEV_SERVER_URL);
+        if (!process.env.IS_TEST) win.webContents.openDevTools();
+      } else {
+        createProtocol('app');
+        // Load the index.html when not in development
+        win.loadURL('app://./index.html');
+      }
+
+      win.on('closed', () => {
+        logger.debug('Window closed');
+        win = null;
+        socket.setBrowserWindow(null);
+      });
+
+      logger.debug('Window created');
+    })
+    .catch((error) => {
+      logger.error('Error occurred during open window!', error.message);
+      dialog.showErrorBox('연결 실패', '채팅 서버에 연결할 수 없습니다.');
+      process.exit(1);
+    });
 }
 
 // Quit when all windows are closed.
@@ -92,9 +210,8 @@ app.on('ready', async () => {
     }
   }
 
+  // 소켓 생성
   socket = new ChatSocket();
-  socket.addIpcEmitter('message.receive');
-  socket.addIpcEmitter('user.enter');
 
   createWindow();
 });
@@ -123,12 +240,36 @@ ipcMain.on('req.reconnect', () => {
   socket.connect();
 });
 
+ipcMain.on('app.login', (e, data) => {
+  appLogin(data)
+    .then(() => {
+      win.webContents.send('app.login.result', { success: true });
+    })
+    .catch((error) => {
+      if (error.response && error.response.status === 403) {
+        win.webContents.send('app.login.result', { success: false, message: error.response.data.message });
+      } else {
+        logger.error('Error occurred during login!', error.message);
+      }
+    });
+});
+
+ipcMain.on('app.login.required', (e) => {
+  e.returnValue = loginRequired;
+});
+
 ipcMain.on('getConnection', () => {
-  win.webContents.send('connection', {
-    connect: socket.isConnected(),
-    retryCount: socket.getRetryCount(),
-    maxCount: ChatSocket.getMaxRetryCount(),
-  });
+  if (socket) {
+    win.webContents.send('connection', {
+      connect: socket.isConnected(),
+      retryCount: socket.getRetryCount(),
+      maxCount: ChatSocket.getMaxRetryCount(),
+    });
+  } else {
+    win.webContents.send('connection', {
+      connect: false,
+    });
+  }
 });
 
 ipcMain.on('message.send', (e, data) => {

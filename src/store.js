@@ -33,7 +33,7 @@ const store = new Vuex.Store({
   },
 });
 
-ipcRenderer.send('getConnection');
+// ipcRenderer.send('getConnection');
 ipcRenderer.on('connection', (e, { connect, retryCount, maxCount }) => {
   if (connect !== undefined) store.commit('setSocketConnectState', connect);
   if (retryCount !== undefined) store.commit('setSocketRetryCount', retryCount);

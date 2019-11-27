@@ -26,21 +26,70 @@
         </chat-room>
       </v-col>
     </v-row>
+
+    <v-overlay
+      v-model="dialog"
+      absolute
+      color="#fafafa"
+      opacity="1"
+    >
+      <v-card :loading="loading" width="480" light>
+        <v-card-title>환영합니다!</v-card-title>
+        <v-card-subtitle>이용을 위해서는 로그인이 필요합니다.</v-card-subtitle>
+        <v-card-text>
+          <v-text-field
+            v-model="form.loginId"
+            :error="!!errorMessage"
+            required
+          >
+            <template v-slot:label>
+              <i class="fa fa-user"></i> Username
+            </template>
+          </v-text-field>
+          <v-text-field
+            type="password"
+            v-model="form.loginPw"
+            :error-messages="errorMessage"
+            @keyup.enter.exact="login"
+            required
+          >
+            <template v-slot:label>
+              <i class="fa fa-lock"></i> Password
+            </template>
+          </v-text-field>
+        </v-card-text>
+        <v-divider></v-divider>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="blue darken-1" text @click="login">Login</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-overlay>
   </v-app>
 </template>
 
 <script>
+import { ipcRenderer } from 'electron';
 import { mapState } from 'vuex';
 import ChatSidebar from './components/ChatSidebar.vue';
 import ChatRoom from './components/ChatRoom.vue';
-
-const { ipcRenderer } = require('electron');
 
 export default {
   name: 'App',
   components: {
     ChatSidebar,
     ChatRoom,
+  },
+  data() {
+    return {
+      dialog: true,
+      loading: false,
+      errorMessage: '',
+      form: {
+        loginId: '',
+        loginPw: '',
+      },
+    };
   },
   computed: {
     ...mapState({
@@ -53,6 +102,24 @@ export default {
       this.$store.commit('setSocketRetryCount', 0);
       ipcRenderer.send('req.reconnect');
     },
+    login() {
+      this.loading = true;
+      this.errorMessage = '';
+
+      ipcRenderer.send('app.login', this.form);
+      ipcRenderer.once('app.login.result', (e, result) => {
+        this.loading = false;
+
+        if (result.success) {
+          this.dialog = false;
+        } else {
+          this.errorMessage = result.message;
+        }
+      });
+    },
+  },
+  created() {
+    this.dialog = ipcRenderer.sendSync('app.login.required');
   },
 };
 </script>

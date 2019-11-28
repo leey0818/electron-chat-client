@@ -69,9 +69,6 @@ class ChatSocket {
       this.sendWindowMessage('connection', { connect: false, retryCount: -1 });
     });
 
-    this.socket.on('ping', () => logger.debug('send ping!'));
-    this.socket.on('pong', latency => logger.debug(`received pong! ${latency}ms`));
-
     // this.sendWindowMessage('connection', {
     //   connect: this.isConnected(),
     //   retryCount: this.getRetryCount(),

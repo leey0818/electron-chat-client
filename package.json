@@ -16,7 +16,7 @@
     "@fortawesome/fontawesome-free": "^5.8.2",
     "axios": "^0.21.1",
     "core-js": "^2.6.5",
-    "log4js": "^5.2.2",
+    "log4js": "^6.4.0",
     "moment": "^2.24.0",
     "roboto-fontface": "*",
     "socket.io-client": "^2.3.0",
